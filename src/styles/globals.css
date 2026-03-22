@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* フェーズ別ボーダーカラー（Tailwindクラスの補完） */
+@layer components {
+  .card-past {
+    @apply border-l-[2.5px] border-l-past;
+  }
+  .card-ongoing {
+    @apply border-l-[2.5px] border-l-ongoing;
+  }
+  .card-future {
+    @apply border-l-[2.5px] border-l-future;
+  }
+}
+
+/* スクロールバーのスタイル（横スクロール用） */
+.timeline-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.timeline-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
