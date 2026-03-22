@@ -49,12 +49,24 @@
     "vite": "^7.0.0"
   },
   "build": {
-    "electronRebuildConfig": {
-      "onlyModules": [
-        "better-sqlite3",
-        "keytar"
-      ],
-      "force": true
+    "appId": "com.horizonguide.app",
+    "productName": "Horizon Guide",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "out/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
