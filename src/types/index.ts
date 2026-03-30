@@ -165,3 +165,41 @@ export interface SessionLogEntry {
   eventType: 'app_launched' | 'app_closed'
   timestamp: string
 }
+
+// ────────────────────────────────────────────────
+// 学習者プロフィール（FR-19）
+// ────────────────────────────────────────────────
+
+/** 属性（学校種別） */
+export type LearnerType =
+  | 'working_adult'      // 社会人
+  | 'professional_univ'  // 専門職大学
+  | 'university'         // 大学
+  | 'vocational'         // 専門学校
+  | 'high_school'        // 高校
+
+/** 学問分野マスタエントリ（academic_field_master テーブルの1行） */
+export interface AcademicFieldMaster {
+  id: string
+  label: string
+  sortOrder: number
+  isActive: boolean
+}
+
+/** 学習者プロフィール */
+export interface UserProfile {
+  id: string
+  learnerType: LearnerType | null
+  academicField: string | null  // academic_field_master.id を参照
+  createdAt: string
+  updatedAt: string
+}
+
+/** 属性ラベルマップ（ハードコード） */
+export const LEARNER_TYPE_LABELS: Record<LearnerType, string> = {
+  working_adult:     '社会人',
+  professional_univ: '専門職大学',
+  university:        '大学',
+  vocational:        '専門学校',
+  high_school:       '高校',
+}
