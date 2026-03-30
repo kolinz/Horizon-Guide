@@ -4,12 +4,14 @@ import {
   ArrowRight, CheckCircle2, SkipForward, Key, ExternalLink,
 } from 'lucide-react'
 import { useGoalStore } from '../../stores/goalStore'
+import type { LearnerType } from '../../types'
+import { LEARNER_TYPE_LABELS } from '../../types'
 
 // ──────────────────────────────────────────────
 // 型
 // ──────────────────────────────────────────────
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3 | 4 | 5
 
 // ──────────────────────────────────────────────
 // ステップインジケーター
@@ -19,8 +21,9 @@ function StepIndicator({ current }: { current: Step }) {
   const steps: { id: Step; label: string }[] = [
     { id: 1, label: 'ようこそ' },
     { id: 2, label: 'AI設定' },
-    { id: 3, label: 'キャリアゴール' },
-    { id: 4, label: 'WBゴール' },
+    { id: 3, label: 'プロフィール' },
+    { id: 4, label: 'キャリアゴール' },
+    { id: 5, label: 'WBゴール' },
   ]
 
   return (
@@ -53,7 +56,7 @@ function StepIndicator({ current }: { current: Step }) {
           </div>
           {idx < steps.length - 1 && (
             <div
-              className={`w-10 h-px mb-4 transition-colors duration-300 ${
+              className={`w-8 h-px mb-4 transition-colors duration-300 ${
                 current > s.id ? 'bg-green-400' : 'bg-gray-200'
               }`}
             />
@@ -314,7 +317,111 @@ function AISetupStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
 }
 
 // ──────────────────────────────────────────────
-// Step 3 — キャリアゴール入力
+// Step 3 — 学習者プロフィール設定（FR-19）
+// ──────────────────────────────────────────────
+
+function ProfileStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
+  const { academicFieldMaster, loadUserProfile, saveUserProfile } = useGoalStore()
+
+  // 初期値：専門職大学 / 情報学
+  const [learnerType, setLearnerType] = useState<string>('professional_univ')
+  const [academicField, setAcademicField] = useState<string>('informatics')
+  const [saving, setSaving] = useState(false)
+
+  // マスタが未ロードの場合は取得
+  useEffect(() => {
+    if (academicFieldMaster.length === 0) {
+      loadUserProfile()
+    }
+  }, [])
+
+  const handleNext = async () => {
+    setSaving(true)
+    try {
+      await saveUserProfile(
+        (learnerType as LearnerType) || null,
+        academicField || null
+      )
+      onNext()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="w-full max-w-lg mx-auto">
+      <div className="mb-6">
+        <div className="text-3xl mb-3">👤</div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">あなたについて教えてください</h2>
+        <p className="text-sm text-gray-500 leading-relaxed">
+          AI助言をあなたに合わせて最適化します。
+        </p>
+      </div>
+
+      <div className="space-y-5">
+        {/* 属性 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            属性
+            <span className="ml-1 text-sm text-gray-400 font-normal">（最も近いものを選んでください）</span>
+          </label>
+          <select
+            value={learnerType}
+            onChange={(e) => setLearnerType(e.target.value)}
+            className="w-full px-4 py-3 text-sm border border-gray-300 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors bg-white"
+          >
+            {(Object.entries(LEARNER_TYPE_LABELS) as [LearnerType, string][]).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 学問分野 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            学問分野
+            <span className="ml-1 text-sm text-gray-400 font-normal">（最も近いものを選んでください）</span>
+          </label>
+          <select
+            value={academicField}
+            onChange={(e) => setAcademicField(e.target.value)}
+            className="w-full px-4 py-3 text-sm border border-gray-300 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors bg-white"
+          >
+            {academicFieldMaster.map((f) => (
+              <option key={f.id} value={f.id}>{f.label}</option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-gray-400">
+            ※ あとから設定画面の「学習者プロフィール」でいつでも変更できます。
+          </p>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onSkip}
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-3 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
+          >
+            <SkipForward size={14} /> スキップ（未設定のまま進む）
+          </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+          >
+            {saving
+              ? <><Loader2 size={14} className="animate-spin" />保存中...</>
+              : <>次へ <ChevronRight size={14} /></>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Step 4 — キャリアゴール入力
 // ──────────────────────────────────────────────
 
 interface CareerFormState {
@@ -389,7 +496,7 @@ function CareerGoalStep({ initialState, onChange, onNext }: {
 }
 
 // ──────────────────────────────────────────────
-// Step 4 — WBゴール設定（任意）
+// Step 5 — WBゴール設定（任意）
 // ──────────────────────────────────────────────
 
 function WellbeingGoalStep({ careerGoalText, onComplete, onSkip, isSubmitting }: {
@@ -518,12 +625,17 @@ interface OnboardingFlowProps {
 }
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
-  const { saveCareerGoal, saveWellbeingGoal } = useGoalStore()
+  const { saveCareerGoal, saveWellbeingGoal, loadUserProfile } = useGoalStore()
   const [step, setStep] = useState<Step>(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [careerForm, setCareerForm] = useState({ text: '', targetDate: '', userName: '' })
 
-  const handleCareerNext = useCallback(() => { setStep(4) }, [])
+  // マスタデータを事前ロード
+  useEffect(() => {
+    loadUserProfile()
+  }, [loadUserProfile])
+
+  const handleCareerNext = useCallback(() => { setStep(5) }, [])
 
   const persistCareerGoal = useCallback(async () => {
     await saveCareerGoal({
@@ -565,8 +677,14 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           {step > 1 && <StepIndicator current={step} />}
           {step === 1 && <WelcomeStep onNext={() => setStep(2)} />}
           {step === 2 && <AISetupStep onNext={() => setStep(3)} onSkip={() => setStep(3)} />}
-          {step === 3 && <CareerGoalStep initialState={careerForm} onChange={setCareerForm} onNext={handleCareerNext} />}
-          {step === 4 && (
+          {step === 3 && (
+            <ProfileStep
+              onNext={() => setStep(4)}
+              onSkip={() => setStep(4)}
+            />
+          )}
+          {step === 4 && <CareerGoalStep initialState={careerForm} onChange={setCareerForm} onNext={handleCareerNext} />}
+          {step === 5 && (
             <WellbeingGoalStep
               careerGoalText={careerForm.text}
               onComplete={handleCompleteWithWB}
@@ -592,14 +710,17 @@ interface AppRootProps {
 }
 
 export function AppRoot({ children }: AppRootProps) {
-  const { careerGoal, loadGoals } = useGoalStore()
+  const { careerGoal, loadGoals, loadUserProfile } = useGoalStore()
   const [checked, setChecked] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
-    const init = async () => { await loadGoals(); setChecked(true) }
+    const init = async () => {
+      await Promise.all([loadGoals(), loadUserProfile()])
+      setChecked(true)
+    }
     init()
-  }, [loadGoals])
+  }, [loadGoals, loadUserProfile])
 
   useEffect(() => {
     if (checked) setShowOnboarding(careerGoal === null)
