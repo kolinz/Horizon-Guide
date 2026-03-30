@@ -3,17 +3,19 @@ import {
   Target, Leaf, Cpu, Download, Database, Globe,
   CheckCircle2, XCircle, Loader2, Sparkles, RefreshCw,
   ChevronRight, AlertTriangle, FlaskConical, Shield,
+  User, GripVertical, Plus, Trash2,
 } from 'lucide-react'
 import { useGoalStore } from '../../stores/goalStore'
 import { ResetConfirmModal } from '../Modals/ResetConfirmModal'
 import { useAIStore } from '../../stores/aiStore'
-import type { AIConfig, LearningType, LearningLocation, LearningModality } from '../../types'
+import type { AIConfig, LearnerType } from '../../types'
+import { LEARNER_TYPE_LABELS } from '../../types'
 
 // ─────────────────────────────────────────────────────
 // 型
 // ─────────────────────────────────────────────────────
 
-type SectionId = 'career' | 'wellbeing' | 'ai' | 'export' | 'data' | 'display'
+type SectionId = 'career' | 'wellbeing' | 'profile' | 'ai' | 'export' | 'data' | 'display'
 
 interface SidebarItem {
   id: SectionId
@@ -307,7 +309,219 @@ function WellbeingSection({ showToast }: { showToast: (msg: string, type?: 'succ
 }
 
 // ─────────────────────────────────────────────────────
-// 3. AI接続設定セクション
+// 3. 学習者プロフィールセクション（FR-19）
+// ─────────────────────────────────────────────────────
+
+function ProfileSection({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const {
+    userProfile,
+    academicFieldMaster,
+    saveUserProfile,
+    addAcademicField,
+    deleteAcademicField,
+    reorderAcademicFields,
+    loadUserProfile,
+  } = useGoalStore()
+
+  const [learnerType, setLearnerType] = useState<string>(userProfile?.learnerType ?? '')
+  const [academicField, setAcademicField] = useState<string>(userProfile?.academicField ?? '')
+  const [saving, setSaving] = useState(false)
+
+  // 新規学問野追加フォーム
+  const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  // ドラッグ＆ドロップ用
+  const dragItemIndex = useRef<number | null>(null)
+
+  // userProfileが外部から更新されたときにフォームを同期
+  useEffect(() => {
+    setLearnerType(userProfile?.learnerType ?? '')
+    setAcademicField(userProfile?.academicField ?? '')
+  }, [userProfile])
+
+  // マスタが未ロードの場合は取得
+  useEffect(() => {
+    if (academicFieldMaster.length === 0) {
+      loadUserProfile()
+    }
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await saveUserProfile(
+        (learnerType as LearnerType) || null,
+        academicField || null
+      )
+      showToast('学習者プロフィールを保存しました')
+    } catch {
+      showToast('保存に失敗しました', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAddField = async () => {
+    const label = newFieldLabel.trim()
+    if (!label) return
+    setAdding(true)
+    try {
+      await addAcademicField(label)
+      setNewFieldLabel('')
+    } catch {
+      showToast('追加に失敗しました', 'error')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleDeleteField = async (id: string) => {
+    try {
+      await deleteAcademicField(id)
+      // 削除した選択肢が現在選択中の場合はリセット
+      if (academicField === id) setAcademicField('')
+    } catch {
+      showToast('削除に失敗しました', 'error')
+    }
+  }
+
+  // ドラッグ＆ドロップ並び替え
+  const handleDragStart = (index: number) => { dragItemIndex.current = index }
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault() }
+  const handleDrop = async (dropIndex: number) => {
+    if (dragItemIndex.current === null || dragItemIndex.current === dropIndex) return
+    const items = [...academicFieldMaster]
+    const [dragged] = items.splice(dragItemIndex.current, 1)
+    items.splice(dropIndex, 0, dragged)
+    dragItemIndex.current = null
+    try {
+      await reorderAcademicFields(items.map((f) => f.id))
+    } catch {
+      showToast('並び替えに失敗しました', 'error')
+    }
+  }
+
+  return (
+    <div className="max-w-lg space-y-6">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-800 mb-1">学習者プロフィール</h2>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          AI助言をあなたの学習環境に合わせて最適化します。設定しなくても他の機能はすべて利用できます。
+        </p>
+      </div>
+
+      {/* 属性 */}
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            属性
+            <span className="ml-1 text-gray-400 font-normal">（最も近いものを選んでください）</span>
+          </label>
+          <select
+            value={learnerType}
+            onChange={(e) => setLearnerType(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors bg-white"
+          >
+            <option value="">（未設定）</option>
+            {(Object.entries(LEARNER_TYPE_LABELS) as [LearnerType, string][]).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 学問分野 */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            学問分野
+            <span className="ml-1 text-gray-400 font-normal">（最も近いものを選んでください）</span>
+          </label>
+          <select
+            value={academicField}
+            onChange={(e) => setAcademicField(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors bg-white"
+          >
+            <option value="">（未設定）</option>
+            {academicFieldMaster.map((f) => (
+              <option key={f.id} value={f.id}>{f.label}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-gray-400">※ いつでもここで変更できます。</p>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-lg transition-colors"
+          >
+            {saving && <Loader2 size={13} className="animate-spin" />}
+            保存する
+          </button>
+        </div>
+      </div>
+
+      {/* 学問分野の管理 */}
+      <div className="border-t border-gray-100 pt-5">
+        <h3 className="text-xs font-semibold text-gray-700 mb-1">学問分野の管理</h3>
+        <p className="text-[11px] text-gray-400 mb-3">プルダウンの選択肢を追加・削除・並び替えできます。</p>
+
+        {/* 現在の選択肢リスト */}
+        <ul className="space-y-1 mb-4">
+          {academicFieldMaster.map((field, index) => (
+            <li
+              key={field.id}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(index)}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg cursor-grab active:cursor-grabbing group"
+            >
+              <GripVertical size={13} className="text-gray-300 flex-shrink-0" />
+              <span className="flex-1 text-sm text-gray-700">{field.label}</span>
+              <button
+                type="button"
+                onClick={() => handleDeleteField(field.id)}
+                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 text-[11px] text-red-500 hover:bg-red-50 rounded transition-all"
+              >
+                <Trash2 size={11} />
+                削除
+              </button>
+            </li>
+          ))}
+          {academicFieldMaster.length === 0 && (
+            <li className="text-xs text-gray-400 py-2 text-center">選択肢がありません</li>
+          )}
+        </ul>
+
+        {/* 追加フォーム */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newFieldLabel}
+            onChange={(e) => setNewFieldLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddField()}
+            placeholder="例：工学、心理学 など"
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors"
+          />
+          <button
+            type="button"
+            onClick={handleAddField}
+            disabled={adding || !newFieldLabel.trim()}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded-lg transition-colors"
+          >
+            {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            追加
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────
+// 4. AI接続設定セクション
 // ─────────────────────────────────────────────────────
 
 const LLM_SERVICES = [
@@ -347,11 +561,10 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [saving, setSaving]     = useState(false)
 
-  // 初期表示時にkeytarからAPIキーを読み込んで表示
   useEffect(() => {
     const loadKeys = async () => {
       try {
-        if (config?.provider === 'local') return  // ローカルLLMはAPIキー不要
+        if (config?.provider === 'local') return
         const service = config?.provider === 'dify' ? 'dify' : (config?.llm?.service ?? 'gemini')
         const key = await window.electronAPI.loadApiKey?.(service)
         if (key) {
@@ -366,7 +579,6 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
     loadKeys()
   }, [])
 
-  // LLMサービス変更時にデフォルトモデルを更新
   const handleServiceChange = (service: LLMService) => {
     const def = LLM_SERVICES.find((s) => s.value === service)?.defaultModel ?? ''
     setForm((p) => ({ ...p, llmService: service, llmModel: def }))
@@ -384,7 +596,6 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
 
       await saveConfig(aiConfig)
 
-      // APIキーを keytar に保存
       if (form.provider === 'llm' && form.llmApiKey) {
         await window.electronAPI.saveApiKey?.(form.llmService, form.llmApiKey)
       } else if (form.provider === 'dify' && form.difyApiKey) {
@@ -392,7 +603,7 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
       }
 
       showToast('AI接続設定を保存しました')
-      setForm((p) => ({ ...p, llmApiKey: '', difyApiKey: '' })) // APIキー入力をクリア
+      setForm((p) => ({ ...p, llmApiKey: '', difyApiKey: '' }))
     } catch {
       showToast('保存に失敗しました', 'error')
     } finally {
@@ -437,7 +648,6 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
 
           {form.provider === 'llm' && (
             <div className="space-y-3 pl-5">
-              {/* サービス選択 */}
               <div className="flex gap-2 flex-wrap">
                 {LLM_SERVICES.map((svc) => (
                   <label key={svc.value} className="flex items-center gap-1.5 cursor-pointer">
@@ -453,8 +663,6 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
                   </label>
                 ))}
               </div>
-
-              {/* モデル名 */}
               <div>
                 <label className="block text-xs text-gray-600 mb-1">モデル名</label>
                 <input
@@ -464,8 +672,6 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
                   className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                 />
               </div>
-
-              {/* APIキー */}
               <div>
                 <label className="block text-xs text-gray-600 mb-1">
                   APIキー
@@ -624,7 +830,7 @@ function AISection({ showToast }: { showToast: (msg: string, type?: 'success' | 
 }
 
 // ─────────────────────────────────────────────────────
-// 4. エクスポートセクション
+// 5. エクスポートセクション
 // ─────────────────────────────────────────────────────
 
 function ExportSection({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
@@ -667,7 +873,6 @@ function ExportSection({ showToast }: { showToast: (msg: string, type?: 'success
     <div className="max-w-lg">
       <h2 className="text-sm font-semibold text-gray-800 mb-4">エクスポート</h2>
       <div className="space-y-3">
-        {/* CSV */}
         <div className="border border-gray-200 rounded-xl p-4">
           <p className="text-xs font-medium text-gray-700 mb-1">CSVエクスポート（全データ）</p>
           <p className="text-[11px] text-gray-400 mb-3">学習カード・アウトプット・ゴール・AI履歴の全データを5ファイルのZIPで出力します。</p>
@@ -681,7 +886,6 @@ function ExportSection({ showToast }: { showToast: (msg: string, type?: 'success
           </button>
         </div>
 
-        {/* PDFポートフォリオ */}
         <div className="border border-gray-200 rounded-xl p-4">
           <p className="text-xs font-medium text-gray-700 mb-1">PDFポートフォリオ（A4縦）</p>
           <p className="text-[11px] text-gray-400 mb-3">WBゴール・キャリアゴール・学習履歴をA4縦レイアウトで出力します。</p>
@@ -694,7 +898,6 @@ function ExportSection({ showToast }: { showToast: (msg: string, type?: 'success
           </button>
         </div>
 
-        {/* PDFタイムライン */}
         <div className="border border-gray-200 rounded-xl p-4">
           <p className="text-xs font-medium text-gray-700 mb-1">PDFタイムライン印刷</p>
           <p className="text-[11px] text-gray-400 mb-3">タイムライン画面をそのままA3横でPDF出力します。</p>
@@ -712,7 +915,7 @@ function ExportSection({ showToast }: { showToast: (msg: string, type?: 'success
 }
 
 // ─────────────────────────────────────────────────────
-// 5. データ管理セクション
+// 6. データ管理セクション
 // ─────────────────────────────────────────────────────
 
 function DataSection({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
@@ -760,7 +963,6 @@ function DataSection({ showToast }: { showToast: (msg: string, type?: 'success' 
       setExportingCSV(false)
     }
   }
-
 
   return (
     <div className="max-w-lg space-y-5">
@@ -823,7 +1025,7 @@ function DataSection({ showToast }: { showToast: (msg: string, type?: 'success' 
         <div className="border border-red-200 rounded-xl p-4 space-y-3">
           <p className="text-xs text-gray-500 leading-relaxed">
             すべての学習データ・ゴール・AI履歴が削除されます。
-            <span className="font-medium text-gray-700">AI接続設定（APIキー等）は保持されます。</span>
+            <span className="font-medium text-gray-700">AI接続設定（APIキー等）・学習者プロフィールは保持されます。</span>
           </p>
           <div className="flex gap-2 flex-wrap">
             <button
@@ -855,7 +1057,7 @@ function DataSection({ showToast }: { showToast: (msg: string, type?: 'success' 
 }
 
 // ─────────────────────────────────────────────────────
-// 6. 表示・言語セクション
+// 7. 表示・言語セクション
 // ─────────────────────────────────────────────────────
 
 function DisplaySection() {
@@ -865,7 +1067,6 @@ function DisplaySection() {
     <div className="max-w-lg">
       <h2 className="text-sm font-semibold text-gray-800 mb-4">表示・言語</h2>
       <div className="space-y-5">
-        {/* 言語 */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-2">言語</label>
           <select
@@ -877,7 +1078,6 @@ function DisplaySection() {
           <p className="mt-1 text-[11px] text-gray-400">将来のバージョンで多言語対応予定です</p>
         </div>
 
-        {/* テーマ */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-2">テーマ</label>
           <div className="flex gap-2">
@@ -915,12 +1115,13 @@ interface SettingsPageProps {
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
-  { id: 'career',   label: 'キャリアゴール',         icon: <Target size={14} /> },
-  { id: 'wellbeing',label: 'WBゴール',               icon: <Leaf size={14} /> },
-  { id: 'ai',       label: 'AI接続設定',             icon: <Cpu size={14} /> },
-  { id: 'export',   label: 'エクスポート',           icon: <Download size={14} /> },
-  { id: 'data',     label: 'データ管理',             icon: <Database size={14} /> },
-  { id: 'display',  label: '表示・言語',             icon: <Globe size={14} /> },
+  { id: 'career',   label: 'キャリアゴール',   icon: <Target size={14} /> },
+  { id: 'wellbeing',label: 'WBゴール',         icon: <Leaf size={14} /> },
+  { id: 'profile',  label: '学習者プロフィール', icon: <User size={14} /> },
+  { id: 'ai',       label: 'AI接続設定',       icon: <Cpu size={14} /> },
+  { id: 'export',   label: 'エクスポート',     icon: <Download size={14} /> },
+  { id: 'data',     label: 'データ管理',       icon: <Database size={14} /> },
+  { id: 'display',  label: '表示・言語',       icon: <Globe size={14} /> },
 ]
 
 export function SettingsPage({ onClose }: SettingsPageProps) {
@@ -931,6 +1132,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     switch (active) {
       case 'career':    return <CareerSection    showToast={showToast} />
       case 'wellbeing': return <WellbeingSection showToast={showToast} />
+      case 'profile':   return <ProfileSection   showToast={showToast} />
       case 'ai':        return <AISection        showToast={showToast} />
       case 'export':    return <ExportSection    showToast={showToast} />
       case 'data':      return <DataSection      showToast={showToast} />
