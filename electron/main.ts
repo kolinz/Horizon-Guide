@@ -1,6 +1,6 @@
 import { registerAIHandlers, setAIConfigGetter } from './ai-bridge'
 import {
-  app, BrowserWindow, ipcMain, dialog, shell,
+  app, BrowserWindow, ipcMain, dialog, shell, Menu,
 } from 'electron'
 import type { WebContentsPrintOptions } from 'electron'
 import { join } from 'path'
@@ -75,6 +75,7 @@ app.whenReady().then(() => {
   registerAIHandlers()
   try { insertSessionLog('app_launched') } catch (e) { console.error('session launch log failed:', e) }
   createWindow()
+  createMenu()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
@@ -545,3 +546,54 @@ ipcMain.handle('reset-database', async () => {
 ipcMain.handle('db-log-action',     (_e, entry) => { try { insertActionLog(entry)     } catch (e) { console.error('db-log-action:', e)     } })
 ipcMain.handle('db-log-motivation', (_e, entry) => { try { insertMotivationLog(entry) } catch (e) { console.error('db-log-motivation:', e) } })
 ipcMain.handle('db-log-goal',       (_e, entry) => { try { insertGoalLog(entry)       } catch (e) { console.error('db-log-goal:', e)       } })
+
+// ── アプリケーションメニュー ────────────────────
+
+function createMenu(): void {
+  const isMac = process.platform === 'darwin'
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const },
+      ],
+    }] : []),
+
+    {
+      label: '編集',
+      submenu: [
+        { role: 'undo' as const,      label: '元に戻す' },
+        { role: 'redo' as const,      label: 'やり直す' },
+        { type: 'separator' as const },
+        { role: 'cut' as const,       label: '切り取り' },
+        { role: 'copy' as const,      label: 'コピー' },
+        { role: 'paste' as const,     label: '貼り付け' },
+        { role: 'selectAll' as const, label: 'すべて選択' },
+      ],
+    },
+
+    {
+      label: 'ヘルプ',
+      submenu: [
+        {
+          label: 'GitHubリポジトリ',
+          click: () => shell.openExternal('https://github.com/kolinz/Horizon-Guide'),
+        },
+      ],
+    },
+
+    ...(process.env.NODE_ENV === 'development' ? [{
+      label: '開発',
+      submenu: [
+        { role: 'reload' as const,          label: 'リロード' },
+        { role: 'forceReload' as const,     label: '強制リロード' },
+        { role: 'toggleDevTools' as const,  label: 'DevToolsを開く' },
+      ],
+    }] : []),
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
