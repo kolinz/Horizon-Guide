@@ -26,6 +26,7 @@ function HomeScreen() {
 
   // 画面状態
   const [showSettings, setShowSettings] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   // 学習カードモーダル
   const [learningCardModal, setLearningCardModal] = useState<{
@@ -53,7 +54,11 @@ function HomeScreen() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-50">
       {/* トップバー */}
-      <TopBar onOpenSettings={() => setShowSettings(true)} onAddCard={handleAddCard} />
+      <TopBar
+        onOpenSettings={() => setShowSettings(true)}
+        onAddCard={handleAddCard}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+      />
 
       {/* メインエリア */}
       <div className="flex flex-1 overflow-hidden">
@@ -66,7 +71,7 @@ function HomeScreen() {
         />
 
         {/* AIサイドバー */}
-        <AISidebar />
+        {isSidebarOpen && <AISidebar onClose={() => setIsSidebarOpen(false)} />}
       </div>
 
       {/* モーダル群 */}
