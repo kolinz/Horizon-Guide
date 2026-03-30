@@ -5,7 +5,7 @@ import React, {
   useCallback,
   KeyboardEvent,
 } from 'react'
-import { Send, Trash2, Bot, Wifi, WifiOff } from 'lucide-react'
+import { Send, Trash2, Bot, Wifi, WifiOff, X } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { useAIStore } from '../../stores/aiStore'
 import { useGoalStore } from '../../stores/goalStore'
@@ -63,7 +63,7 @@ function EmptyState() {
 // AISidebar 本体
 // ──────────────────────────────────────────────
 
-export function AISidebar() {
+export function AISidebar({ onClose }: { onClose: () => void }) {
   const { messages, isStreaming, config, sendChat, clearMessages } = useAIStore()
   const { careerGoal, wellbeingGoal } = useGoalStore()
   const learningCards = useTimelineStore((s) => s.learningCards)
@@ -191,6 +191,16 @@ export function AISidebar() {
               <Trash2 size={12} />
             </button>
           )}
+
+          {/* パネルを閉じるボタン */}
+          <button
+            onClick={onClose}
+            className="p-1 rounded text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            title="パネルを閉じる"
+            aria-label="AIパネルを閉じる"
+          >
+            <X size={13} />
+          </button>
         </div>
       </div>
 
