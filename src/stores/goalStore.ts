@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import type { CareerGoal, WellbeingGoal } from '../types'
+import type {
+  CareerGoal,
+  WellbeingGoal,
+  UserProfile,
+  LearnerType,
+  AcademicFieldMaster,
+} from '../types'
 
 // ──────────────────────────────────────────────
 // 型定義
@@ -10,6 +16,10 @@ interface GoalState {
   wellbeingGoal: WellbeingGoal | null
   isLoading: boolean
 
+  // FR-19: 学習者プロフィール
+  userProfile: UserProfile | null
+  academicFieldMaster: AcademicFieldMaster[]
+
   loadGoals: () => Promise<void>
   saveCareerGoal: (
     goal: Omit<CareerGoal, 'id' | 'createdAt' | 'updatedAt'>
@@ -17,6 +27,13 @@ interface GoalState {
   saveWellbeingGoal: (
     goal: Omit<WellbeingGoal, 'id' | 'createdAt' | 'updatedAt'>
   ) => Promise<void>
+
+  // FR-19: 学習者プロフィール操作
+  loadUserProfile: () => Promise<void>
+  saveUserProfile: (learnerType: LearnerType | null, academicField: string | null) => Promise<void>
+  addAcademicField: (label: string) => Promise<void>
+  deleteAcademicField: (id: string) => Promise<void>
+  reorderAcademicFields: (ids: string[]) => Promise<void>
 }
 
 // ──────────────────────────────────────────────
@@ -34,6 +51,10 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   careerGoal: null,
   wellbeingGoal: null,
   isLoading: false,
+
+  // FR-19 初期値
+  userProfile: null,
+  academicFieldMaster: [],
 
   // ────────────────────────────────
   // 両ゴールを読み込む
@@ -57,11 +78,9 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   saveCareerGoal: async (goalInput) => {
     const current = get().careerGoal
 
-    // 初回か更新かを判定
     const isNew = current === null
     const eventType = isNew ? 'goal_created' : 'goal_updated'
 
-    // 既存ゴールを引き継ぐ（id / createdAt は新規生成 or 既存を使用）
     const goal: CareerGoal = {
       id: current?.id ?? newId(),
       ...goalInput,
@@ -71,7 +90,6 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
     await window.electronAPI.saveCareerGoal(goal)
 
-    // goal_log 記録（ベストエフォート）
     window.electronAPI
       .logGoal({
         eventType,
@@ -102,7 +120,6 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
     await window.electronAPI.saveWellbeingGoal(goal)
 
-    // goal_log 記録（ベストエフォート）
     window.electronAPI
       .logGoal({
         eventType,
@@ -125,5 +142,65 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       .catch((e) => console.error('logGoal(wellbeing):', e))
 
     set({ wellbeingGoal: goal })
+  },
+
+  // ────────────────────────────────
+  // FR-19: 学習者プロフィール読み込み
+  // ────────────────────────────────
+  loadUserProfile: async () => {
+    try {
+      const [profileData, masterData] = await Promise.all([
+        window.electronAPI.getUserProfile(),
+        window.electronAPI.getAcademicFieldMaster(),
+      ])
+      // DB行（camelCase済み）をUserProfile型にマッピング
+      const userProfile: UserProfile | null = profileData
+        ? {
+            id: profileData.id,
+            learnerType: profileData.learnerType as LearnerType | null,
+            academicField: profileData.academicField,
+            createdAt: profileData.createdAt,
+            updatedAt: profileData.updatedAt,
+          }
+        : null
+      set({ userProfile, academicFieldMaster: masterData })
+    } catch (e) {
+      console.error('loadUserProfile:', e)
+    }
+  },
+
+  // ────────────────────────────────
+  // FR-19: 学習者プロフィール保存
+  // ────────────────────────────────
+  saveUserProfile: async (learnerType, academicField) => {
+    await window.electronAPI.saveUserProfile(learnerType, academicField)
+    await get().loadUserProfile()
+  },
+
+  // ────────────────────────────────
+  // FR-19: 学問区分 追加
+  // ────────────────────────────────
+  addAcademicField: async (label) => {
+    await window.electronAPI.addAcademicField(label)
+    const masterData = await window.electronAPI.getAcademicFieldMaster()
+    set({ academicFieldMaster: masterData })
+  },
+
+  // ────────────────────────────────
+  // FR-19: 学問区分 削除（論理削除）
+  // ────────────────────────────────
+  deleteAcademicField: async (id) => {
+    await window.electronAPI.deleteAcademicField(id)
+    const masterData = await window.electronAPI.getAcademicFieldMaster()
+    set({ academicFieldMaster: masterData })
+  },
+
+  // ────────────────────────────────
+  // FR-19: 学問区分 並び替え
+  // ────────────────────────────────
+  reorderAcademicFields: async (ids) => {
+    await window.electronAPI.reorderAcademicFields(ids)
+    const masterData = await window.electronAPI.getAcademicFieldMaster()
+    set({ academicFieldMaster: masterData })
   },
 }))
