@@ -1,117 +1,104 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type {
-  LearningCard,
-  OutputCard,
-  CareerGoal,
-  WellbeingGoal,
-  AIConfig,
-  ActionLogEntry,
-  MotivationLogEntry,
-  GoalLogEntry,
-} from '../src/types'
+import type { ElectronAPI } from '@electron-toolkit/preload'
 
-/**
- * レンダラープロセスに公開する electronAPI。
- * メインプロセスとの通信はすべてここを経由する。
- * nodeIntegration: false / contextIsolation: true を維持するため、
- * 直接 Node.js API をレンダラーに渡さない。
- */
+// electron-vite v5 のビルド出力は out/preload/index.mjs（ESM形式）
+// main.ts の preload パスは join(__dirname, '../preload/index.mjs') とすること
+
 contextBridge.exposeInMainWorld('electronAPI', {
-  // ──────────────────────────────────────
+  // ─────────────────────────────────────────────
   // 学習カード CRUD
-  // ──────────────────────────────────────
-  getLearningCards: (): Promise<LearningCard[]> =>
+  // ─────────────────────────────────────────────
+  getLearningCards: () =>
     ipcRenderer.invoke('db-get-learning-cards'),
-
-  upsertLearningCard: (card: LearningCard): Promise<void> =>
+  upsertLearningCard: (card: unknown) =>
     ipcRenderer.invoke('db-upsert-learning-card', card),
-
-  deleteLearningCard: (id: string): Promise<void> =>
+  deleteLearningCard: (id: string) =>
     ipcRenderer.invoke('db-delete-learning-card', id),
 
-  updateMotivation: (id: string, level: number | null): Promise<void> =>
+  // ─────────────────────────────────────────────
+  // モチベーション更新
+  // ─────────────────────────────────────────────
+  updateMotivation: (id: string, level: number | null) =>
     ipcRenderer.invoke('db-update-motivation', { id, level }),
 
-  // ──────────────────────────────────────
+  // ─────────────────────────────────────────────
   // アウトプットカード CRUD
-  // ──────────────────────────────────────
-  upsertOutputCard: (card: OutputCard): Promise<void> =>
+  // ─────────────────────────────────────────────
+  upsertOutputCard: (card: unknown) =>
     ipcRenderer.invoke('db-upsert-output-card', card),
-
-  deleteOutputCard: (id: string): Promise<void> =>
+  deleteOutputCard: (id: string) =>
     ipcRenderer.invoke('db-delete-output-card', id),
 
-  // ──────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ゴール
-  // ──────────────────────────────────────
-  getCareerGoal: (): Promise<CareerGoal | null> =>
+  // ─────────────────────────────────────────────
+  getCareerGoal: () =>
     ipcRenderer.invoke('db-get-career-goal'),
-
-  saveCareerGoal: (goal: CareerGoal): Promise<void> =>
+  saveCareerGoal: (goal: unknown) =>
     ipcRenderer.invoke('db-save-career-goal', goal),
-
-  getWellbeingGoal: (): Promise<WellbeingGoal | null> =>
+  getWellbeingGoal: () =>
     ipcRenderer.invoke('db-get-wellbeing-goal'),
-
-  saveWellbeingGoal: (goal: WellbeingGoal): Promise<void> =>
+  saveWellbeingGoal: (goal: unknown) =>
     ipcRenderer.invoke('db-save-wellbeing-goal', goal),
 
-  // ──────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // 学習者プロフィール（FR-19）
+  // ─────────────────────────────────────────────
+  getUserProfile: () =>
+    ipcRenderer.invoke('db-get-user-profile'),
+  saveUserProfile: (learnerType: string | null, academicField: string | null) =>
+    ipcRenderer.invoke('db-save-user-profile', { learnerType, academicField }),
+
+  // 学問区分マスタ（FR-19）
+  getAcademicFieldMaster: () =>
+    ipcRenderer.invoke('db-get-academic-field-master'),
+  addAcademicField: (label: string) =>
+    ipcRenderer.invoke('db-add-academic-field', { label }),
+  deleteAcademicField: (id: string) =>
+    ipcRenderer.invoke('db-delete-academic-field', { id }),
+  reorderAcademicFields: (ids: string[]) =>
+    ipcRenderer.invoke('db-reorder-academic-fields', { ids }),
+
+  // ─────────────────────────────────────────────
   // AI設定・呼び出し
-  // ──────────────────────────────────────
-  saveAIConfig: (config: AIConfig): Promise<void> =>
+  // ─────────────────────────────────────────────
+  saveAIConfig: (config: unknown) =>
     ipcRenderer.invoke('save-ai-config', config),
-
-  loadAIConfig: (): Promise<AIConfig | null> =>
+  loadAIConfig: () =>
     ipcRenderer.invoke('load-ai-config'),
-
-  chatAI: (message: string, context: string): Promise<string> =>
+  saveApiKey: (provider: string, apiKey: string) =>
+    ipcRenderer.invoke('save-api-key', { provider, apiKey }),
+  loadApiKey: (provider: string) =>
+    ipcRenderer.invoke('load-api-key', provider),
+  chatAI: (message: string, context: string) =>
     ipcRenderer.invoke('chat-ai', { message, context }),
-
-  analyzeAI: (context: string): Promise<string> =>
+  analyzeAI: (context: string) =>
     ipcRenderer.invoke('analyze-ai', { context }),
 
-  // ──────────────────────────────────────
+  // ─────────────────────────────────────────────
   // データ管理
-  // ──────────────────────────────────────
-  exportCSV: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+  // ─────────────────────────────────────────────
+  exportCSV: () =>
     ipcRenderer.invoke('export-csv'),
-
-  exportResearchLog: (
-    anonymize: boolean
-  ): Promise<{ success: boolean; path?: string; error?: string }> =>
+  exportResearchLog: (anonymize: boolean) =>
     ipcRenderer.invoke('export-research-log', { anonymize }),
-
-  resetDatabase: (): Promise<void> =>
+  resetDatabase: () =>
     ipcRenderer.invoke('reset-database'),
 
-  // ──────────────────────────────────────
-  // 研究用ログ記録（レンダラーから呼ぶ）
-  // ──────────────────────────────────────
-  logAction: (entry: Omit<ActionLogEntry, 'id' | 'timestamp'>): Promise<void> =>
+  // ─────────────────────────────────────────────
+  // 研究用行動ログ
+  // ─────────────────────────────────────────────
+  logAction: (entry: unknown) =>
     ipcRenderer.invoke('db-log-action', entry),
-
-  logMotivation: (entry: Omit<MotivationLogEntry, 'id' | 'timestamp'>): Promise<void> =>
+  logMotivation: (entry: unknown) =>
     ipcRenderer.invoke('db-log-motivation', entry),
-
-  logGoal: (entry: Omit<GoalLogEntry, 'id' | 'timestamp'>): Promise<void> =>
+  logGoal: (entry: unknown) =>
     ipcRenderer.invoke('db-log-goal', entry),
-
-  // ──────────────────────────────────────
-  // APIキー管理（keytarへの直接保存・読み込み）
-  // ──────────────────────────────────────
-  saveApiKey: (provider: string, apiKey: string): Promise<void> =>
-    ipcRenderer.invoke('save-api-key', { provider, apiKey }),
-
-  loadApiKey: (provider: string): Promise<string | null> =>
-    ipcRenderer.invoke('load-api-key', provider),
-
-  // ──────────────────────────────────────
-  // PDFエクスポート
-  // ──────────────────────────────────────
-  exportPDFPortfolio: (): Promise<{ success: boolean; path?: string; error?: string }> =>
-    ipcRenderer.invoke('export-pdf-portfolio'),
-
-  exportPDFTimeline: (): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('export-pdf-timeline'),
 })
+
+// @electron-toolkit/preload の型宣言（IPC以外のElectron APIアクセス用）
+declare global {
+  interface Window {
+    electron: ElectronAPI
+  }
+}

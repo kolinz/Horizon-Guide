@@ -31,6 +31,15 @@ import {
   getAllGoalLogs,
   getAllSessionLogs,
 } from './db/queries/researchLog'
+// ── FR-19: 学習者プロフィール ─────────────────
+import {
+  getUserProfile,
+  saveUserProfile,
+  getAcademicFieldMaster,
+  addAcademicField,
+  deleteAcademicField,
+  reorderAcademicFields,
+} from './db/queries/userProfile'
 
 import type { AIConfig, LearningCard, WellbeingGoal, CareerGoal } from '../src/types'
 
@@ -117,6 +126,48 @@ ipcMain.handle('db-get-career-goal',     () => getCareerGoal())
 ipcMain.handle('db-save-career-goal',    (_e, goal) => saveCareerGoal(goal))
 ipcMain.handle('db-get-wellbeing-goal',  () => getWellbeingGoal())
 ipcMain.handle('db-save-wellbeing-goal', (_e, goal) => saveWellbeingGoal(goal))
+
+// ── IPC: 学習者プロフィール（FR-19） ──────────
+
+ipcMain.handle('db-get-user-profile', () => {
+  const row = getUserProfile()
+  if (!row) return null
+  return {
+    id: row.id,
+    learnerType: row.learner_type,
+    academicField: row.academic_field,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+})
+
+ipcMain.handle('db-save-user-profile', (_e, { learnerType, academicField }) => {
+  saveUserProfile(learnerType ?? null, academicField ?? null)
+})
+
+// ── IPC: 学問区分マスタ（FR-19） ──────────────
+
+ipcMain.handle('db-get-academic-field-master', () => {
+  return getAcademicFieldMaster().map((r) => ({
+    id: r.id,
+    label: r.label,
+    sortOrder: r.sort_order,
+    isActive: r.is_active === 1,
+  }))
+})
+
+ipcMain.handle('db-add-academic-field', (_e, { label }) => {
+  const row = addAcademicField(label)
+  return { id: row.id, label: row.label, sortOrder: row.sort_order, isActive: row.is_active === 1 }
+})
+
+ipcMain.handle('db-delete-academic-field', (_e, { id }) => {
+  deleteAcademicField(id)
+})
+
+ipcMain.handle('db-reorder-academic-fields', (_e, { ids }) => {
+  reorderAcademicFields(ids)
+})
 
 // ── IPC: AI設定 ───────────────────────────────
 
