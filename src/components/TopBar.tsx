@@ -13,6 +13,7 @@ import { buildContext } from '../utils/contextBuilder'
 interface TopBarProps {
   onOpenSettings: () => void
   onAddCard: () => void
+  onOpenSidebar: () => void
 }
 
 // ──────────────────────────────────────────────
@@ -104,7 +105,7 @@ function CareerGoalPill({ text, targetDate, onClick }: CareerGoalPillProps) {
 // TopBar 本体
 // ──────────────────────────────────────────────
 
-export function TopBar({ onOpenSettings, onAddCard }: TopBarProps) {
+export function TopBar({ onOpenSettings, onAddCard, onOpenSidebar }: TopBarProps) {
   const { careerGoal, wellbeingGoal } = useGoalStore()
   const learningCards = useTimelineStore((s) => s.learningCards)
   const { sendAnalyze, isStreaming } = useAIStore()
@@ -122,12 +123,13 @@ export function TopBar({ onOpenSettings, onAddCard }: TopBarProps) {
     setGoalModal((prev) => ({ ...prev, open: false }))
   }, [])
 
-  // 「AI 助言」ボタン押下 → Analyze mode
+  // 「AI 助言」ボタン：サイドバーを開いてから Analyze mode を実行
   const handleAnalyze = useCallback(async () => {
     if (isStreaming) return
+    onOpenSidebar()
     const context = buildContext(careerGoal, wellbeingGoal, learningCards)
     await sendAnalyze(context)
-  }, [isStreaming, careerGoal, wellbeingGoal, learningCards, sendAnalyze])
+  }, [isStreaming, onOpenSidebar, careerGoal, wellbeingGoal, learningCards, sendAnalyze])
 
   return (
     <>
