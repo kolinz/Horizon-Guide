@@ -1,18 +1,46 @@
-import type { CareerGoal, WellbeingGoal, LearningCard } from '../types'
+import type {
+  CareerGoal,
+  WellbeingGoal,
+  LearningCard,
+  UserProfile,
+  AcademicFieldMaster,
+  LearnerType,
+} from '../types'
+import { LEARNER_TYPE_LABELS } from '../types'
 
 /**
  * AI助言に渡すコンテキスト文字列を生成する。
  * Chat mode / Analyze mode の両方で使用。
+ *
+ * userProfile / academicFieldMaster は任意。
+ * 設定済みの場合はコンテキスト冒頭に【学習者プロフィール】セクションを追加する。
  */
 export function buildContext(
   careerGoal: CareerGoal | null,
   wellbeingGoal: WellbeingGoal | null,
-  learningCards: LearningCard[]
+  learningCards: LearningCard[],
+  userProfile?: UserProfile | null,
+  academicFieldMaster?: AcademicFieldMaster[]
 ): string {
   if (!careerGoal) {
     return '【キャリアゴール】未設定\n【学習タイムライン】データなし'
   }
 
+  // ── 学習者プロフィールセクション（設定済みの場合のみ生成）──
+  let profileSection = ''
+  if (userProfile?.learnerType) {
+    const learnerLabel = LEARNER_TYPE_LABELS[userProfile.learnerType as LearnerType] ?? userProfile.learnerType
+    const fieldLabel = userProfile.academicField && academicFieldMaster
+      ? (academicFieldMaster.find((f) => f.id === userProfile.academicField)?.label ?? userProfile.academicField)
+      : '特になし'
+    profileSection = `【学習者プロフィール】
+種別: ${learnerLabel}
+学問区分: ${fieldLabel}
+
+`
+  }
+
+  // ── ウェルビーイングゴールセクション ──
   const wbSection = wellbeingGoal
     ? `${wellbeingGoal.text}
   - 個人: ${wellbeingGoal.axes.personal ?? '未設定'}
@@ -20,6 +48,7 @@ export function buildContext(
   - 地球: ${wellbeingGoal.axes.planet  ?? '未設定'}`
     : '未設定'
 
+  // ── 学習タイムラインセクション ──
   const cardSection = learningCards.length === 0
     ? '（学習カードなし）'
     : learningCards
@@ -48,7 +77,7 @@ ${outputs}`
         })
         .join('\n')
 
-  return `【ウェルビーイングゴール（Why）】
+  return `${profileSection}【ウェルビーイングゴール（Why）】
 ${wbSection}
 
 【キャリアゴール（What）】
